@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 require 'chingu'
+require 'texplay'
 include Gosu
 
 class JezzBall < Chingu::Window
@@ -14,7 +15,7 @@ class Cursor < Chingu::GameObject
 
   def setup
     @image = Image['mouse.png']
-    self.input = { :mouse_right => :flip, :mouse_left => :create_wall }
+    self.input = { :mouse_right => :flip, :mouse_left => :create_rays }
   end
 
   def flip
@@ -26,14 +27,13 @@ class Cursor < Chingu::GameObject
     @angle % 180 == 0 ? :vertical : :horizontal
   end
 
-  def create_wall
-    growth_directions = case orientation 
-    when :vertical 
-      [:up, :down] 
-    when :horizontal 
-      [:right, :left] 
-    end
-    Wall.create(x: $window.mouse_x, y: $window.mouse_y, growth_directions: growth_directions, original: true)
+  def create_rays
+    Ray.create(origin_x: $window.mouse_x, origin_y: $window.mouse_y, direction: orientation == :vertical ? :up : :left)
+    Ray.create(origin_x: $window.mouse_x, origin_y: $window.mouse_y, direction: orientation == :vertical ? :down : :right)
+  end
+
+  def draw
+    draw_at($window.mouse_x, $window.mouse_y)
   end
 
 end
@@ -57,7 +57,6 @@ class Gameplay < Chingu::GameState
 
   def draw
     $window.caption = "#{Wall.all.size} - framerate: #{$window.fps}]"
-    @cursor_obj.draw_at($window.mouse_x, $window.mouse_y)
     super
   end
 
@@ -80,6 +79,69 @@ class Ball < Chingu::GameObject
 
 end
 
+class Ray < Chingu::GameObject
+
+  attr_accessor :walls, :direction
+  trait :timer
+  trait :bounding_box
+
+  RAY_THICKNESS = 10
+  GROWTH_UNIT = 5
+
+  def initialize(options = {})
+    @direction = options[:direction]
+    @origin_x = options[:origin_x]
+    @origin_y = options[:origin_y]
+    @growth = 0
+    super(options.merge(x: @origin_x, y: @origin_y))
+  end
+
+  def setup
+    super 
+    width = case @direction
+    when :right
+      $window.width - @origin_x
+    when :left
+      @origin_x
+    else
+      RAY_THICKNESS
+    end
+    height = case @direction
+    when :up
+      $window.height - @origin_y
+    when :down
+      @origin_y
+    else
+      RAY_THICKNESS
+    end
+    @image = TexPlay.create_image($window, width, height)
+    @x += @image.width / 2 if @direction == :right
+    @x -= @image.width / 2 if @direction == :left
+    every(100) do 
+      @growth += GROWTH_UNIT
+    end
+  end
+
+  def draw
+    super
+    color = [:right, :up].include?(@direction) ? :blue : :yellow
+    x1 = case @direction
+    when :right
+      0
+    else
+      @origin_x
+    end
+    x2 = @direction == :right ? @growth : @origin_x - @growth
+    @image.rect(x1, 0, x2, RAY_THICKNESS, color: color, fill: true)
+  end
+
+  def bounding_box
+    # TODO: make this real
+    Chingu::Rect.new(@origin_x, @origin_y, @growth, RAY_THICKNESS)
+  end
+
+end
+
 # TODO: need to know if a wall is currently being drawn (1 at a time)
 #       means you need to keep track of which walls are part of "yourself" so you can delete them later 
 # real concept is 2 separate rays... should you grow rays? should you keep adding sprites and then merge them after its done? 
@@ -89,7 +151,7 @@ end
 
 class Wall < Chingu::GameObject
   trait :bounding_box
-  traits :collision_detection, :timer
+  traits :collision_detection
 
   def initialize(options)
     { growth_directions: [], original: false }.merge!(options)
@@ -102,25 +164,6 @@ class Wall < Chingu::GameObject
     super
     @image = Image['wall.png']
     self.factor = 0.1
-    @growth_directions.each do |dir|
-      new_x, new_y = @x, @y
-      new_growth_directions = [dir]
-      case dir
-      when :left
-        new_x -= (@image.width * self.factor)
-      when :right
-        new_x += (@image.width * self.factor)
-      when :up
-        new_y -= (@image.height * self.factor)
-      when :down
-        new_y += (@image.height * self.factor)
-      end
-      if inside_window?(new_x, new_y)
-        after(100) do
-          Wall.create(x: new_x, y: new_y, growth_directions: new_growth_directions)
-        end
-      end
-    end
     cache_bounding_box
   end
 

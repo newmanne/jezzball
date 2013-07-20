@@ -46,14 +46,20 @@ class Gameplay < Chingu::GameState
     self.input = { :escape => :exit,  }
   end
 
+  def setup
+    Ball.create
+    super
+  end
+
   def update
     super
     Ball.each_collision(Ray) do |ball, ray|
       if [:left, :right].include?(ray.direction)
-        ball.velocity_x = - ball.velocity_x
-      else
         ball.velocity_y = - ball.velocity_y
+      else
+        ball.velocity_x = - ball.velocity_x
       end
+      break
     end
   end
 
@@ -65,7 +71,7 @@ class Gameplay < Chingu::GameState
 end
 
 class Ball < Chingu::GameObject
-  trait :bounding_circle
+  trait :bounding_circle, debug: true
   traits :collision_detection, :velocity
 
   def setup
@@ -77,6 +83,13 @@ class Ball < Chingu::GameObject
     @image = Image['ball.png']
     self.factor = 0.1
     cache_bounding_circle
+  end
+
+  def update
+    if outside_window?
+      @x = $window.width / 2
+      @y = $window.height / 2
+    end
   end
 
 end
@@ -116,7 +129,7 @@ class Ray < Chingu::GameObject
     @x -= @image.width / 2 if @direction == :left
     @y += @image.height / 2 if @direction == :down
     @y -= @image.height / 2 if @direction == :up
-    every(GROWTH_TIME) do 
+    every(GROWTH_TIME) do # TODO: stop this
       @growth += GROWTH_UNIT
     end
   end
@@ -145,17 +158,18 @@ class Ray < Chingu::GameObject
   end
 
   def bounding_box
-    # TODO: tidy these up
+    # TODO: negative numbers seem to cause problems
     x1, y1, x2, y2 = rect_points
+    width, height = [x2 - x1, y2 - y1]
     case @direction
     when :right
-      Chingu::Rect.new(@x - (@image.width / 2), @y - (@image.height / 2), x2 - x1, y2 - y1)
+      Chingu::Rect.new(@x - (@image.width / 2), @y - (@image.height / 2), width, height)
     when :left
-      Chingu::Rect.new(@x + (@image.width / 2), @y - (@image.height / 2), x2 - x1 , y2 - y1)
+      Chingu::Rect.new(@x + (@image.width / 2), @y - (@image.height / 2), width , height)
     when :down
-      Chingu::Rect.new(@x - (@image.width / 2), @y - (@image.height / 2), x2 - x1 , y2 - y1)
+      Chingu::Rect.new(@x - (@image.width / 2), @y - (@image.height / 2), width , height)
     when :up
-      Chingu::Rect.new(@x - (@image.width / 2), @y + (@image.height / 2), x2 - x1 , y2 - y1)
+      Chingu::Rect.new(@x - (@image.width / 2), @y + (@image.height / 2), width , height)
     end
   end
 

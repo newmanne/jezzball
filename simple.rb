@@ -158,18 +158,18 @@ class Ray < Chingu::GameObject
   end
 
   def bounding_box
-    # TODO: negative numbers seem to cause problems
+    # TODO: clean this up
     x1, y1, x2, y2 = rect_points
     width, height = [x2 - x1, y2 - y1]
     case @direction
     when :right
       Chingu::Rect.new(@x - (@image.width / 2), @y - (@image.height / 2), width, height)
     when :left
-      Chingu::Rect.new(@x + (@image.width / 2), @y - (@image.height / 2), width , height)
+      Chingu::Rect.new(@x + (@image.width / 2) + width, @y - (@image.height / 2), width.abs , height)
     when :down
       Chingu::Rect.new(@x - (@image.width / 2), @y - (@image.height / 2), width , height)
     when :up
-      Chingu::Rect.new(@x - (@image.width / 2), @y + (@image.height / 2), width , height)
+      Chingu::Rect.new(@x - (@image.width / 2), @y + (@image.height / 2) + height, width , height.abs)
     end
   end
 

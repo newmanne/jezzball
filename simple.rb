@@ -87,6 +87,7 @@ class Ray < Chingu::GameObject
 
   RAY_THICKNESS = 10
   GROWTH_UNIT = 5
+  GROWTH_TIME = 100
 
   def initialize(options = {})
     @direction = options[:direction]
@@ -100,20 +101,20 @@ class Ray < Chingu::GameObject
     super 
     width, height = case @direction
     when :right
-      $window.width - @origin_x, RAY_THICKNESS
+      [$window.width - @origin_x, RAY_THICKNESS]
     when :left
-      @origin_x, RAY_THICKNESS
-    when :up
-      RAY_THICKNESS, $window.height - @origin_y
+      [@origin_x, RAY_THICKNESS]
     when :down
-      RAY_THICKNESS, @origin_y
+      [RAY_THICKNESS, $window.height - @origin_y]
+    when :up
+      [RAY_THICKNESS, @origin_y]
     end
     @image = TexPlay.create_image($window, width, height)
     @x += @image.width / 2 if @direction == :right
     @x -= @image.width / 2 if @direction == :left
     @y += @image.height / 2 if @direction == :down
     @y -= @image.height / 2 if @direction == :up
-    every(100) do 
+    every(GROWTH_TIME) do 
       @growth += GROWTH_UNIT
     end
   end
@@ -122,32 +123,14 @@ class Ray < Chingu::GameObject
     super
     color = [:right, :up].include?(@direction) ? :blue : :yellow
     x1, y1, x2, y2 = case @direction
-    when :up, :down, :right
-      0
-    else
-      @origin_x
-    end
-    x2 = case @direction 
-    when :right
-      @growth 
-    when :left
-     @origin_x - @growth
-    else
-      RAY_THICKNESS
-    end
-    y1 = case @direction
-    when :right, :left, :down
-      0
-    else
-      @origin_y
-    end
-    y2 = case @direction
-    when :down
-      @growth
     when :up
-      @origin_y - @growth
-    else
-      RAY_THICKNESS
+      [0, @origin_y, RAY_THICKNESS, @origin_y - @growth]
+    when :down
+      [0, 0, RAY_THICKNESS, @growth]
+    when :left
+      [@origin_x, 0, @origin_x - @growth, RAY_THICKNESS]
+    when :right
+      [0, 0, @growth, RAY_THICKNESS]
     end
     @image.rect(x1, y1, x2, y2, color: color, fill: true)
   end

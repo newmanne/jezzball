@@ -42,21 +42,23 @@ class Gameplay < Chingu::GameState
 
   def initialize(options = {})
     super
-    @wall_create_orientation = :vertical
-    @cursor_obj = Cursor.create(x: $window.mouse_x, y: $window.mouse_y)
+    Cursor.create(x: $window.mouse_x, y: $window.mouse_y)
     self.input = { :escape => :exit,  }
   end
 
   def update
     super
-    Ball.each_collision(Wall) do |ball, wall|
-      ball.velocity_x = - ball.velocity_x
-      break # only the first collision is worth handling
+    Ball.each_collision(Ray) do |ball, ray|
+      if [:left, :right].include?(ray.direction)
+        ball.velocity_x = - ball.velocity_x
+      else
+        ball.velocity_y = - ball.velocity_y
+      end
     end
   end
 
   def draw
-    $window.caption = "#{Wall.all.size} - framerate: #{$window.fps}]"
+    $window.caption = "framerate: #{$window.fps}]"
     super
   end
 
@@ -83,7 +85,7 @@ class Ray < Chingu::GameObject
 
   attr_accessor :walls, :direction
   trait :timer
-  trait :bounding_box
+  trait :bounding_box, debug: true
 
   RAY_THICKNESS = 10
   GROWTH_UNIT = 5
@@ -122,7 +124,12 @@ class Ray < Chingu::GameObject
   def draw
     super
     color = [:right, :up].include?(@direction) ? :blue : :yellow
-    x1, y1, x2, y2 = case @direction
+    x1, y1, x2, y2 = rect_points
+    @image.rect(x1, y1, x2, y2, color: color, fill: true)
+  end
+
+  def rect_points
+    case @direction
     when :up
       [0, @origin_y, RAY_THICKNESS, @origin_y - @growth]
     when :down
@@ -132,39 +139,24 @@ class Ray < Chingu::GameObject
     when :right
       [0, 0, @growth, RAY_THICKNESS]
     end
-    @image.rect(x1, y1, x2, y2, color: color, fill: true)
+  end
+
+  def completed?
   end
 
   def bounding_box
-    # TODO: make this real
-    Chingu::Rect.new(@origin_x, @origin_y, @growth, RAY_THICKNESS)
-  end
-
-end
-
-# TODO: need to know if a wall is currently being drawn (1 at a time)
-#       means you need to keep track of which walls are part of "yourself" so you can delete them later 
-# real concept is 2 separate rays... should you grow rays? should you keep adding sprites and then merge them after its done? 
-# should you just use rects?
-# Class should just create 2 rays, and keep refs to them. The 2 rays will have methods saying whether or not they are done.
-# the rays will use the after type stuff
-
-class Wall < Chingu::GameObject
-  trait :bounding_box
-  traits :collision_detection
-
-  def initialize(options)
-    { growth_directions: [], original: false }.merge!(options)
-    @growth_directions = options[:growth_directions]
-    @original = options[:original]
-    super
-  end
-
-  def setup
-    super
-    @image = Image['wall.png']
-    self.factor = 0.1
-    cache_bounding_box
+    # TODO: tidy these up
+    x1, y1, x2, y2 = rect_points
+    case @direction
+    when :right
+      Chingu::Rect.new(@x - (@image.width / 2), @y - (@image.height / 2), x2 - x1, y2 - y1)
+    when :left
+      Chingu::Rect.new(@x + (@image.width / 2), @y - (@image.height / 2), x2 - x1 , y2 - y1)
+    when :down
+      Chingu::Rect.new(@x - (@image.width / 2), @y - (@image.height / 2), x2 - x1 , y2 - y1)
+    when :up
+      Chingu::Rect.new(@x - (@image.width / 2), @y + (@image.height / 2), x2 - x1 , y2 - y1)
+    end
   end
 
 end

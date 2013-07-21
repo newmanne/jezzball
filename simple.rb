@@ -40,6 +40,8 @@ end
 
 class Gameplay < Chingu::GameState
 
+  GRID_SIZE = 20
+
   def initialize(options = {})
     super
     Cursor.create(x: $window.mouse_x, y: $window.mouse_y)
@@ -48,24 +50,43 @@ class Gameplay < Chingu::GameState
 
   def setup
     Ball.create
+    @image = paint_grid
     super
+  end
+
+  def paint_grid
+    TexPlay.create_image($window, $window.width, $window.height).paint {
+      for i in 0..($window.width / GRID_SIZE)
+        for j in 0..($window.height / GRID_SIZE)
+          rect(i * GRID_SIZE, j * GRID_SIZE, (i + 1) * GRID_SIZE, (j + 1) * GRID_SIZE, color: :red)
+        end
+      end
+    }
   end
 
   def update
     super
     Ball.each_collision(Ray) do |ball, ray|
+      # TODO: this doesn't account for hitting the tip
       if [:left, :right].include?(ray.direction)
         ball.velocity_y = - ball.velocity_y
       else
         ball.velocity_x = - ball.velocity_x
       end
-      break
+      unless ray.completed?
+        ray.destroy
+      end
     end
   end
 
   def draw
+    @image.draw(0, 0, 1)
     $window.caption = "framerate: #{$window.fps}]"
     super
+  end
+
+  def on_complete_ray(ray)
+    # TODO: check if the ray's collectively wall off an area. If they do, then do the thing
   end
 
 end
@@ -109,6 +130,7 @@ class Ray < Chingu::GameObject
     @origin_x = options[:origin_x]
     @origin_y = options[:origin_y]
     @growth = 0
+    @complete = false
     super(options.merge(x: @origin_x, y: @origin_y))
   end
 
@@ -131,6 +153,17 @@ class Ray < Chingu::GameObject
     @y -= @image.height / 2 if @direction == :up
     every(GROWTH_TIME) do # TODO: stop this
       @growth += GROWTH_UNIT
+      if ([:right, :left].include?(@direction) and @growth > @image.width) or ([:up, :down].include?(@direction) and @growth > @image.height)
+        @complete = true
+        @parent.on_complete_ray(self)
+      end
+    end
+  end
+
+  def update
+    super
+    if @complete
+      stop_timers
     end
   end
 
@@ -155,6 +188,7 @@ class Ray < Chingu::GameObject
   end
 
   def completed?
+    @complete
   end
 
   def bounding_box

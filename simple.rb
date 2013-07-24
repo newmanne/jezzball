@@ -16,6 +16,7 @@ class Cursor < Chingu::GameObject
   def setup
     @image = Image['mouse.png']
     self.input = { :mouse_right => :flip, :mouse_left => :create_rays }
+    self.factor = 0.1
   end
 
   def flip
@@ -49,12 +50,13 @@ class Gameplay < Chingu::GameState
   end
 
   def setup
-    Ball.create
-    @image = paint_grid
+    # Ball.create
+    @image = create_grid_image
+    @cursor_highlight = TexPlay.create_image($window, GRID_SIZE, GRID_SIZE)
     super
   end
 
-  def paint_grid
+  def create_grid_image
     TexPlay.create_image($window, $window.width, $window.height).paint {
       for i in 0..($window.width / GRID_SIZE)
         for j in 0..($window.height / GRID_SIZE)
@@ -80,6 +82,8 @@ class Gameplay < Chingu::GameState
   end
 
   def draw
+    # TODO: highlight the grid your mouse is hovering over
+    @cursor_highlight.rect(0, 0, GRID_SIZE - 1, GRID_SIZE - 1, color: :green).draw($window.mouse_x - ($window.mouse_x % GRID_SIZE) , $window.mouse_y - ($window.mouse_y % GRID_SIZE), 2)
     @image.draw(0, 0, 1)
     $window.caption = "framerate: #{$window.fps}]"
     super

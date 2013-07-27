@@ -5,7 +5,7 @@ include Gosu
 
 module GridUtil
 
-  def snap_to_grid(coord)
+  def self.snap_to_grid(coord)
     coord - (coord % Gameplay::GRID_SIZE)
   end
 
@@ -21,7 +21,6 @@ class JezzBall < Chingu::Window
 end
 
 class Cursor < Chingu::GameObject
-  include GridUtil
 
   attr_accessor :orientation
 
@@ -47,15 +46,18 @@ class Cursor < Chingu::GameObject
     @image =  @orientation == :vertical ? @vertical_image : @horizontal_image
   end
 
-  def create_rays
-    Ray.create(origin_x: $window.mouse_x, origin_y: $window.mouse_y, direction: orientation == :vertical ? :up : :left)
-    Ray.create(origin_x: $window.mouse_x, origin_y: $window.mouse_y, direction: orientation == :vertical ? :down : :right)
+  # TODO: Cursor probably knows too much about Ray... maybe move this to parent
+  def create_rays 
+    if Ray.all.all? { |ray| ray.completed? }
+      Ray.create(origin_x: $window.mouse_x, origin_y: $window.mouse_y, direction: orientation == :vertical ? :up : :left)
+      Ray.create(origin_x: $window.mouse_x, origin_y: $window.mouse_y, direction: orientation == :vertical ? :down : :right)
+    end
   end
 
   def update
-    @x = snap_to_grid($window.mouse_x) 
+    @x = GridUtil::snap_to_grid($window.mouse_x) 
     @x -= Gameplay::GRID_SIZE if @orientation == :horizontal
-    @y = snap_to_grid($window.mouse_y)
+    @y = GridUtil::snap_to_grid($window.mouse_y)
     @y -= Gameplay::GRID_SIZE if @orientation == :vertical
   end
 
@@ -108,12 +110,11 @@ class Gameplay < Chingu::GameState
   def draw
     @grid_image.draw(0, 0, 0)
     $window.caption = "framerate: #{$window.fps}]"
+    @d.draw(0, 0, 0) if @d
     super
   end
 
-
   def on_complete_ray(ray)
-    # TODO: check if the ray's collectively wall off an area. If they do, then do the thing
   end
 
 end
@@ -143,7 +144,6 @@ class Ball < Chingu::GameObject
 end
 
 class Ray < Chingu::GameObject
-  include GridUtil
 
   attr_accessor :walls, :direction
   trait :timer
@@ -155,8 +155,8 @@ class Ray < Chingu::GameObject
 
   def initialize(options = {})
     @direction = options[:direction]
-    @origin_x = snap_to_grid(options[:origin_x])
-    @origin_y = snap_to_grid(options[:origin_y])
+    @origin_x = GridUtil::snap_to_grid(options[:origin_x])
+    @origin_y = GridUtil::snap_to_grid(options[:origin_y])
     @growth = 0
     @center_x = @center_y = 0 # keep origin at top left
     @complete = false
@@ -165,6 +165,7 @@ class Ray < Chingu::GameObject
 
   def setup
     super 
+    @color =  [:right, :down].include?(@direction) ? :blue : :yellow
     width, height = case @direction
     when :right
       [$window.width - @origin_x, RAY_THICKNESS]
@@ -191,7 +192,7 @@ class Ray < Chingu::GameObject
       @growth += GROWTH_UNIT
       if ([:right, :left].include?(@direction) and @growth > @image.width) or ([:up, :down].include?(@direction) and @growth > @image.height)
         @complete = true
-        @parent.on_complete_ray(self)
+        on_complete
       end
     end
   end
@@ -204,9 +205,8 @@ class Ray < Chingu::GameObject
   end
 
   def draw
-    color = [:right, :down].include?(@direction) ? :blue : :yellow
     x1, y1, x2, y2 = rect_points
-    @image.rect(x1, y1, x2, y2, color: color, fill: true)
+    @image.rect(x1, y1, x2, y2, color: @color, fill: true)
     @image.draw(@x, @y, 1)
   end
 
@@ -228,10 +228,15 @@ class Ray < Chingu::GameObject
     @complete
   end
 
+  def on_complete
+    @color = :green
+    @parent.on_complete_ray(self)
+  end
+
   def bounding_box
     x1, y1, x2, y2 = rect_points
     width, height = [x2 - x1, y2 - y1]
-    Chingu::Rect.new(@x, @y, width, height) # TODO: convert this to take care of neg values (not allowed)
+    Chingu::Rect.new(@x, @y, width, height) # TODO: convert this to take care of neg values (not allowed) #also, its just plain incorrect
   end
 
 end
